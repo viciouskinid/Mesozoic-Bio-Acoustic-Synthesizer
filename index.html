@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesozoic Bio-Acoustic Synthesizer // Web Audio API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090b0e;
+            color: #e2e8f0;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.06) 0%, transparent 55%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 36px 36px, 36px 36px;
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: #1e293b;
+            border-radius: 999px;
+            border: 1px solid #334155;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #f59e0b;
+            cursor: pointer;
+            margin-top: -6px;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        /* Pad Active Pulse */
+        @keyframes padPulse {
+            0% { transform: scale(0.97); }
+            50% { transform: scale(1.01); }
+            100% { transform: scale(1); }
+        }
+        .pad-triggered {
+            animation: padPulse 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .glow-carnivore:hover {
+            box-shadow: 0 0 24px -4px rgba(239, 68, 68, 0.25);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+        .glow-herbivore:hover {
+            box-shadow: 0 0 24px -4px rgba(16, 185, 129, 0.25);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+        .glow-piscivore:hover {
+            box-shadow: 0 0 24px -4px rgba(6, 182, 212, 0.25);
+            border-color: rgba(6, 182, 212, 0.5);
+        }
+    </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-amber-500/30 selection:text-amber-200 pb-16">
+
+    <!-- Top Bio-Acoustic Telemetry & Master Control Bar -->
+    <header class="sticky top-0 z-40 backdrop-blur-xl bg-[#090b0e]/85 border-b border-slate-800/80 shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                
+                <!-- Brand & Status -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-inner">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h1 class="text-lg sm:text-xl font-bold tracking-tight text-slate-100">MESOZOIC BIO-ACOUSTIC LAB</h1>
+                                <span id="engine-status" class="mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">STANDBY</span>
+                            </div>
+                            <p class="text-xs text-slate-400">100% Procedural Web Audio API Formant, Sub-Harmonic & Physical Modeling Engine</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Master Acoustic Controls -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5 items-center bg-slate-900/70 p-3 rounded-xl border border-slate-800">
+                    <!-- Master Gain -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-[11px] mono text-slate-400">
+                            <span>MASTER GAIN</span>
+                            <span id="vol-val" class="text-amber-400">85%</span>
+                        </div>
+                        <input id="master-vol" type="range" min="0" max="1" step="0.01" value="0.85">
+                    </div>
+
+                    <!-- Canyon Reverb Mix -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-[11px] mono text-slate-400">
+                            <span>CANYON REVERB</span>
+                            <span id="rev-val" class="text-amber-400">38%</span>
+                        </div>
+                        <input id="reverb-mix" type="range" min="0" max="0.9" step="0.01" value="0.38">
+                    </div>
+
+                    <!-- Mass / Pitch Scale -->
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between text-[11px] mono text-slate-400">
+                            <span>BODY MASS SCALE</span>
+                            <span id="scale-val" class="text-amber-400">1.00x</span>
+                        </div>
+                        <input id="mass-scale" type="range" min="0.7" max="1.35" step="0.01" value="1.0">
+                    </div>
+
+                    <!-- Ecosystem Sequence Toggle -->
+                    <div class="flex items-center justify-end gap-2">
+                        <button id="ambient-btn" class="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition flex items-center justify-center gap-1.5 cursor-pointer">
+                            <span id="ambient-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                            <span>ECOSYSTEM SIM</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Oscilloscope & Frequency Spectrum Analyzer -->
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="relative h-20 rounded-xl bg-[#06080a] border border-slate-800/90 overflow-hidden">
+                    <span class="absolute top-1.5 left-2.5 mono text-[10px] text-slate-500 uppercase tracking-widest z-10">Time-Domain Waveform (Oscilloscope)</span>
+                    <span id="active-sound-label" class="absolute top-1.5 right-2.5 mono text-[10px] text-amber-400/90 uppercase tracking-wider z-10">READY // CLICK ANY PAD</span>
+                    <canvas id="scope-canvas" class="w-full h-full block"></canvas>
+                </div>
+                <div class="relative h-20 rounded-xl bg-[#06080a] border border-slate-800/90 overflow-hidden">
+                    <span class="absolute top-1.5 left-2.5 mono text-[10px] text-slate-500 uppercase tracking-widest z-10">Spectral Density (20Hz – 16kHz Formants)</span>
+                    <span class="absolute top-1.5 right-2.5 mono text-[10px] text-slate-500 z-10">VARIATION ENGINE: ON</span>
+                    <canvas id="spectrum-canvas" class="w-full h-full block"></canvas>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dinosaur Soundboard Grid -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <!-- Quick Keyboard Hint Banner -->
+        <div class="mb-6 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 bg-slate-900/40 border border-slate-800/60 rounded-xl px-4 py-2.5">
+            <div class="flex items-center gap-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span>Each trigger synthesizes real-time physical & vocal tract acoustics with organic pitch, formant, and transient randomization.</span>
+            </div>
+            <div class="mono text-[11px] text-slate-500">
+                TIP: Adjust <span class="text-slate-300">Body Mass Scale</span> for juvenile vs. alpha specimens
+            </div>
+        </div>
+
+        <!-- 6 Species Cards Container -->
+        <div id="dino-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <!-- Populated dynamically via JS -->
+        </div>
+    </main>
+
+    <script>
+        /**
+         * ============================================================================
+         * MESOZOIC BIO-ACOUSTIC PROCEDURAL SYNTHESIS ENGINE
+         * Pure Web Audio API synthesis: Formant filters, FM vocal folds, Karplus/noise
+         * transients, waveshaper saturation, and algorithmic convolution reverb.
+         * ============================================================================
+         */
+
+        const SPECIES_DATA = [
+            {
+                id: 'trex',
+                name: 'Tyrannosaurus rex',
+                period: 'Late Cretaceous • 68–66 Ma',
+                diet: 'Apex Carnivore',
+                theme: 'carnivore',
+                mass: '8,800 kg',
+                vocalNotes: 'Infrasound closed-mouth rumble + wide-bore laryngeal formant roar & bone-shearing bite force (57,000 N).',
+                keys: ['1', '2', '3'],
+                accentColor: '#ef4444',
+                badgeClass: 'bg-red-500/10 text-red-400 border-red-500/30',
+                glowClass: 'glow-carnivore',
+                pads: [
+                    { action: 'footstep', label: 'Seismic Footstep', sub: 'Tectonic sub-drop + soil crush' },
+                    { action: 'eating', label: 'Bone & Flesh Tear', sub: 'Femur fracture + wet sinew rip' },
+                    { action: 'roar', label: 'Apex Bellow Roar', sub: 'Sub-bass + brassy formant sweep' }
+                ]
+            },
+            {
+                id: 'velociraptor',
+                name: 'Velociraptor mongoliensis',
+                period: 'Late Cretaceous • 75–71 Ma',
+                diet: 'Pack Carnivore',
+                theme: 'carnivore',
+                mass: '18 kg',
+                vocalNotes: 'Avian-style syrinx/larynx hybrid capable of piercing harmonic shrieks, rhythmic pack barks, and hisses.',
+                keys: ['4', '5', '6'],
+                accentColor: '#f97316',
+                badgeClass: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+                glowClass: 'glow-carnivore',
+                pads: [
+                    { action: 'footstep', label: 'Clawed Scurry', sub: 'Rapid sickle-claw pebble taps' },
+                    { action: 'eating', label: 'Frenzied Snap & Rip', sub: 'Quick jaw clicks + flesh tear' },
+                    { action: 'roar', label: 'Avian Pack Shriek', sub: 'FM piercing screech + bark' }
+                ]
+            },
+            {
+                id: 'triceratops',
+                name: 'Triceratops horridus',
+                period: 'Late Cretaceous • 68–66 Ma',
+                diet: 'Megaherbivore',
+                theme: 'herbivore',
+                mass: '10,500 kg',
+                vocalNotes: 'Massive nasal cavity & frill resonance producing deep brassy horn-like bellows and low-frequency grunts.',
+                keys: ['7', '8', '9'],
+                accentColor: '#10b981',
+                badgeClass: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+                glowClass: 'glow-herbivore',
+                pads: [
+                    { action: 'footstep', label: 'Quadruped Stomp', sub: 'Heavy column-leg earth thud' },
+                    { action: 'eating', label: 'Cycad Shear & Grind', sub: 'Beak branch snap + dental battery' },
+                    { action: 'roar', label: 'Nasal Horn Bellow', sub: 'Resonant brassy territorial call' }
+                ]
+            },
+            {
+                id: 'stegosaurus',
+                name: 'Stegosaurus stenops',
+                period: 'Late Jurassic • 155–145 Ma',
+                diet: 'Low-Browser Herbivore',
+                theme: 'herbivore',
+                mass: '5,200 kg',
+                vocalNotes: 'Narrow beak and compact larynx generating low throaty groans, defensive bellows, and dermal plate rattles.',
+                keys: ['Q', 'W', 'E'],
+                accentColor: '#84cc16',
+                badgeClass: 'bg-lime-500/10 text-lime-400 border-lime-500/30',
+                glowClass: 'glow-herbivore',
+                pads: [
+                    { action: 'footstep', label: 'Plated Stride', sub: 'Heavy thud + dorsal plate clack' },
+                    { action: 'eating', label: 'Fern & Shrub Strip', sub: 'Leafy foliage rustle + soft chew' },
+                    { action: 'roar', label: 'Throaty Groan & Snort', sub: 'Guttural defensive bellow + exhale' }
+                ]
+            },
+            {
+                id: 'brachiosaurus',
+                name: 'Brachiosaurus altithorax',
+                period: 'Late Jurassic • 154–150 Ma',
+                diet: 'High-Canopy Herbivore',
+                theme: 'herbivore',
+                mass: '48,000 kg',
+                vocalNotes: '4-meter trachea and elevated nasal crest dome acting as an acoustic chamber for whale-like infrasound calls.',
+                keys: ['A', 'S', 'D'],
+                accentColor: '#14b8a6',
+                badgeClass: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+                glowClass: 'glow-herbivore',
+                pads: [
+                    { action: 'footstep', label: 'Colossal Tremor', sub: '18Hz seismic shockwave + rumble' },
+                    { action: 'eating', label: 'Canopy Strip & Gulp', sub: 'High pine tear + massive swallow' },
+                    { action: 'roar', label: 'Crest Dome Trumpet', sub: 'Melancholic whale-like resonance' }
+                ]
+            },
+            {
+                id: 'spinosaurus',
+                name: 'Spinosaurus aegyptiacus',
+                period: 'Mid Cretaceous • 99–93 Ma',
+                diet: 'Semi-Aquatic Piscivore',
+                theme: 'piscivore',
+                mass: '7,400 kg',
+                vocalNotes: 'Elongated crocodilian rostrum with neurovascular snout pits; hollow, raspy, amphibious bellows and jaw claps.',
+                keys: ['Z', 'X', 'C'],
+                accentColor: '#06b6d4',
+                badgeClass: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+                glowClass: 'glow-piscivore',
+                pads: [
+                    { action: 'footstep', label: 'Riverbank Splash-Thud', sub: 'Mud impact + shallow water splash' },
+                    { action: 'eating', label: 'Conical Jaw Strike', sub: 'Hollow snout snap + scale crunch' },
+                    { action: 'roar', label: 'Crocodilian Snout Roar', sub: 'Hollow tubular rasp + sub-growl' }
+                ]
+            }
+        ];
+
+        // Global Web Audio State
+        let audioCtx = null;
+        let masterGain = null;
+        let dryGain = null;
+        let wetGain = null;
+        let convolver = null;
+        let compressor = null;
+        let analyser = null;
+        let noiseBuffer = null;
+        let ecosystemInterval = null;
+
+        // UI Parameters
+        let params = {
+            volume: 0.85,
+            reverb: 0.38,
+            massScale: 1.0 // >1 = larger/deeper, <1 = smaller/higher
+        };
+
+        /**
+         * Initializes the Web Audio API context and master DSP chain on first user gesture.
+         */
+        function initAudio() {
+            if (audioCtx) {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                return;
+            }
+
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Master Dynamics Compressor to prevent clipping when layering heavy sub-bass & roars
+            compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-14, audioCtx.currentTime);
+            compressor.knee.setValueAtTime(18, audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(6, audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.004, audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.22, audioCtx.currentTime);
+
+            masterGain = audioCtx.createGain();
+            masterGain.gain.setValueAtTime(params.volume, audioCtx.currentTime);
+
+            dryGain = audioCtx.createGain();
+            dryGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+
+            wetGain = audioCtx.createGain();
+            wetGain.gain.setValueAtTime(params.reverb, audioCtx.currentTime);
+
+            // Procedural Canyon / Forest Impulse Response for Realistic Acoustic Space
+            convolver = audioCtx.createConvolver();
+            convolver.buffer = createCanyonImpulseResponse(2.8, 2.4);
+
+            // Real-time Analyser for Oscilloscope & Spectrum Visualizer
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 2048;
+            analyser.smoothingTimeConstant = 0.82;
+
+            // Routing: Sources -> [Dry + Convolver->Wet] -> Compressor -> MasterGain -> Analyser -> Destination
+            dryGain.connect(compressor);
+            convolver.connect(wetGain);
+            wetGain.connect(compressor);
+            compressor.connect(masterGain);
+            masterGain.connect(analyser);
+            analyser.connect(audioCtx.destination);
+
+            // Pre-generate 4 seconds of white/pink noise buffer for organic textures
+            noiseBuffer = createNoiseBuffer(4.0);
+
+            // Update UI status badge
+            const badge = document.getElementById('engine-status');
+            badge.textContent = `ONLINE // ${audioCtx.sampleRate}Hz`;
+            badge.className = 'mono text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+
+            startVisualizers();
+        }
+
+        /**
+         * Generates a stereo algorithmic impulse response simulating a vast Mesozoic valley.
+         */
+        function createCanyonImpulseResponse(duration, decay) {
+            const rate = audioCtx.sampleRate;
+            const length = Math.floor(rate * duration);
+            const impulse = audioCtx.createBuffer(2, length, rate);
+
+            for (let channel = 0; channel < 2; channel++) {
+                const data = impulse.getChannelData(channel);
+                for (let i = 0; i < length; i++) {
+                    const t = i / rate;
+                    // Early discrete reflections + exponential diffuse tail
+                    let env = Math.pow(1 - i / length, decay);
+                    if (t < 0.12 && Math.random() < 0.04) env *= 1.8;
+                    // Low-pass air absorption over time
+                    const airDamping = Math.exp(-t * 1.4);
+                    data[i] = (Math.random() * 2 - 1) * env * airDamping;
+                }
+            }
+            return impulse;
+        }
+
+        /**
+         * Creates a reusable white noise buffer for transient snaps, breath, water, and foliage.
+         */
+        function createNoiseBuffer(seconds) {
+            const length = Math.floor(audioCtx.sampleRate * seconds);
+            const buffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < length; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        /**
+         * Helper: Organic variation multiplier around 1.0 (±variance).
+         */
+        function vary(base, variance = 0.08) {
+            return base * (1 + (Math.random() * 2 - 1) * variance);
+        }
+
+        /**
+         * Helper: Pitch multiplier adjusted by the user's Body Mass Scale slider.
+         * Larger mass = lower fundamental frequencies.
+         */
+        function scaleFreq(freq, variance = 0.06) {
+            return vary(freq, variance) / params.massScale;
+        }
+
+        /**
+         * Helper: Connects any node to both the dry bus and the canyon reverb send.
+         */
+        function routeToMaster(node, reverbSendMultiplier = 1.0) {
+            node.connect(dryGain);
+            if (reverbSendMultiplier > 0) {
+                const send = audioCtx.createGain();
+                send.gain.value = reverbSendMultiplier;
+                node.connect(send);
+                send.connect(convolver);
+            }
+        }
+
+        /**
+         * Helper: Creates a soft-clipping waveshaper curve for vocal fold grit and saturation.
+         */
+        function createDistortionCurve(amount = 25) {
+            const samples = 44100;
+            const curve = new Float32Array(samples);
+            const deg = Math.PI / 180;
+            for (let i = 0; i < samples; ++i) {
+                const x = (i * 2) / samples - 1;
+                curve[i] = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
+            }
+            return curve;
+        }
+
+        /**
+         * Helper: Plays a filtered noise burst with custom envelope.
+         */
+        function triggerNoiseBurst({
+            startTime,
+            duration,
+            filterType = 'bandpass',
+            freqStart = 1000,
+            freqEnd = 600,
+            Q = 1.5,
+            gainPeak = 0.5,
+            attack = 0.01,
+            reverbSend = 0.7
+        }) {
+            const src = audioCtx.createBufferSource();
+            src.buffer = noiseBuffer;
+            src.loop = true;
+            // Random offset in noise buffer so every trigger has unique micro-texture
+            const offset = Math.random() * (noiseBuffer.duration - 0.5);
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = filterType;
+            filter.frequency.setValueAtTime(Math.max(20, freqStart), startTime);
+            filter.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), startTime + duration);
+            filter.Q.setValueAtTime(Q, startTime);
+
+            const env = audioCtx.createGain();
+            env.gain.setValueAtTime(0.0001, startTime);
+            env.gain.linearRampToValueAtTime(gainPeak, startTime + attack);
+            env.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+            src.connect(filter);
+            filter.connect(env);
+            routeToMaster(env, reverbSend);
+
+            src.start(startTime, offset, duration + 0.05);
+            src.stop(startTime + duration + 0.06);
+        }
+
+        /**
+         * ============================================================================
+         * SPECIES SYNTHESIS ENGINES
+         * Each species has bespoke algorithms for Footstep, Eating, and Roar.
+         * ============================================================================
+         */
+        const SynthEngines = {
+            // ------------------------------------------------------------------------
+            // 1. TYRANNOSAURUS REX
+            // ------------------------------------------------------------------------
+            trex: {
+                footstep(t) {
+                    // Massive tectonic sub-bass drop
+                    const subOsc = audioCtx.createOscillator();
+                    const subGain = audioCtx.createGain();
+                    subOsc.type = 'sine';
+                    subOsc.frequency.setValueAtTime(scaleFreq(72, 0.07), t);
+                    subOsc.frequency.exponentialRampToValueAtTime(scaleFreq(22, 0.05), t + 0.45);
+
+                    subGain.gain.setValueAtTime(0.001, t);
+                    subGain.gain.linearRampToValueAtTime(1.15, t + 0.018);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.85);
+
+                    subOsc.connect(subGain);
+                    routeToMaster(subGain, 1.1);
+                    subOsc.start(t);
+                    subOsc.stop(t + 0.9);
+
+                    // Heavy chest/ground thump body
+                    const bodyOsc = audioCtx.createOscillator();
+                    const bodyGain = audioCtx.createGain();
+                    bodyOsc.type = 'triangle';
+                    bodyOsc.frequency.setValueAtTime(scaleFreq(125, 0.08), t);
+                    bodyOsc.frequency.exponentialRampToValueAtTime(scaleFreq(34, 0.06), t + 0.25);
+
+                    bodyGain.gain.setValueAtTime(0.001, t);
+                    bodyGain.gain.linearRampToValueAtTime(0.7, t + 0.01);
+                    bodyGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+                    bodyOsc.connect(bodyGain);
+                    routeToMaster(bodyGain, 0.8);
+                    bodyOsc.start(t);
+                    bodyOsc.stop(t + 0.4);
+
+                    // Dirt & gravel compression crunch
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: 0.38,
+                        filterType: 'lowpass',
+                        freqStart: vary(950, 0.15),
+                        freqEnd: vary(180, 0.1),
+                        Q: 1.2,
+                        gainPeak: 0.55,
+                        attack: 0.015,
+                        reverbSend: 0.9
+                    });
+                },
+
+                eating(t) {
+                    // 1. Heavy jaw slam transient
+                    const jawOsc = audioCtx.createOscillator();
+                    const jawGain = audioCtx.createGain();
+                    jawOsc.type = 'sine';
+                    jawOsc.frequency.setValueAtTime(scaleFreq(180, 0.1), t);
+                    jawOsc.frequency.exponentialRampToValueAtTime(scaleFreq(45, 0.08), t + 0.12);
+                    jawGain.gain.setValueAtTime(0.85, t);
+                    jawGain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+                    jawOsc.connect(jawGain);
+                    routeToMaster(jawGain, 0.5);
+                    jawOsc.start(t);
+                    jawOsc.stop(t + 0.16);
+
+                    // 2. Crisp bone fracture bursts (multiple micro-cracks)
+                    const crackTimes = [0.02, 0.09, 0.19, 0.28];
+                    crackTimes.forEach((offset, idx) => {
+                        triggerNoiseBurst({
+                            startTime: t + offset,
+                            duration: vary(0.07, 0.2),
+                            filterType: 'bandpass',
+                            freqStart: vary(2400 - idx * 250, 0.15),
+                            freqEnd: vary(900, 0.15),
+                            Q: 3.5,
+                            gainPeak: vary(0.65, 0.15),
+                            attack: 0.003,
+                            reverbSend: 0.4
+                        });
+                    });
+
+                    // 3. Wet sinew & flesh tearing rip
+                    triggerNoiseBurst({
+                        startTime: t + 0.16,
+                        duration: vary(0.55, 0.12),
+                        filterType: 'bandpass',
+                        freqStart: vary(650, 0.12),
+                        freqEnd: vary(1450, 0.15),
+                        Q: 2.2,
+                        gainPeak: 0.52,
+                        attack: 0.06,
+                        reverbSend: 0.45
+                    });
+                },
+
+                roar(t) {
+                    const dur = vary(2.6, 0.08);
+                    // Primary vocal fold sawtooth + sub-harmonic octave
+                    const osc1 = audioCtx.createOscillator();
+                    const osc2 = audioCtx.createOscillator();
+                    const subOsc = audioCtx.createOscillator();
+
+                    // Laryngeal vocal fold FM flutter (guttural rasp)
+                    const fmOsc = audioCtx.createOscillator();
+                    const fmGain = audioCtx.createGain();
+                    fmOsc.type = 'sine';
+                    fmOsc.frequency.setValueAtTime(vary(34, 0.1), t);
+                    fmOsc.frequency.linearRampToValueAtTime(vary(24, 0.1), t + dur);
+                    fmGain.gain.setValueAtTime(vary(28, 0.15), t);
+                    fmGain.gain.exponentialRampToValueAtTime(8, t + dur);
+
+                    const baseF = scaleFreq(96, 0.07);
+                    osc1.type = 'sawtooth';
+                    osc2.type = 'sawtooth';
+                    subOsc.type = 'sine';
+
+                    // Pitch contour: rapid attack swell, sustained bellow, deep tail drop
+                    [osc1, osc2].forEach((osc, i) => {
+                        const detune = i === 0 ? 1.0 : 1.018;
+                        osc.frequency.setValueAtTime(baseF * 0.72 * detune, t);
+                        osc.frequency.exponentialRampToValueAtTime(baseF * 1.28 * detune, t + 0.28);
+                        osc.frequency.exponentialRampToValueAtTime(baseF * 0.85 * detune, t + dur * 0.75);
+                        osc.frequency.exponentialRampToValueAtTime(baseF * 0.48 * detune, t + dur);
+                    });
+
+                    subOsc.frequency.setValueAtTime(baseF * 0.45, t);
+                    subOsc.frequency.exponentialRampToValueAtTime(baseF * 0.62, t + 0.3);
+                    subOsc.frequency.exponentialRampToValueAtTime(baseF * 0.28, t + dur);
+
+                    fmOsc.connect(fmGain);
+                    fmGain.connect(osc1.frequency);
+                    fmGain.connect(osc2.frequency);
+
+                    // Waveshaper for roaring vocal cord saturation
+                    const shaper = audioCtx.createWaveShaper();
+                    shaper.curve = createDistortionCurve(35);
+
+                    // Parallel Vocal Tract Formants (Open-jaw throat resonance)
+                    const f1 = audioCtx.createBiquadFilter();
+                    f1.type = 'bandpass';
+                    f1.Q.value = 3.2;
+                    f1.frequency.setValueAtTime(scaleFreq(220), t);
+                    f1.frequency.exponentialRampToValueAtTime(scaleFreq(380), t + 0.35);
+                    f1.frequency.exponentialRampToValueAtTime(scaleFreq(180), t + dur);
+
+                    const f2 = audioCtx.createBiquadFilter();
+                    f2.type = 'bandpass';
+                    f2.Q.value = 4.0;
+                    f2.frequency.setValueAtTime(scaleFreq(580), t);
+                    f2.frequency.exponentialRampToValueAtTime(scaleFreq(890), t + 0.3);
+                    f2.frequency.exponentialRampToValueAtTime(scaleFreq(420), t + dur);
+
+                    const masterEnv = audioCtx.createGain();
+                    masterEnv.gain.setValueAtTime(0.001, t);
+                    masterEnv.gain.linearRampToValueAtTime(0.85, t + 0.18);
+                    masterEnv.gain.setValueAtTime(0.8, t + dur * 0.55);
+                    masterEnv.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+                    osc1.connect(shaper);
+                    osc2.connect(shaper);
+                    shaper.connect(f1);
+                    shaper.connect(f2);
+                    f1.connect(masterEnv);
+                    f2.connect(masterEnv);
+                    subOsc.connect(masterEnv);
+
+                    routeToMaster(masterEnv, 1.25);
+
+                    // Exhale air blast noise
+                    triggerNoiseBurst({
+                        startTime: t + 0.05,
+                        duration: dur * 0.9,
+                        filterType: 'bandpass',
+                        freqStart: scaleFreq(600),
+                        freqEnd: scaleFreq(260),
+                        Q: 1.4,
+                        gainPeak: 0.35,
+                        attack: 0.2,
+                        reverbSend: 1.1
+                    });
+
+                    [osc1, osc2, subOsc, fmOsc].forEach(o => {
+                        o.start(t);
+                        o.stop(t + dur + 0.05);
+                    });
+                }
+            },
+
+            // ------------------------------------------------------------------------
+            // 2. VELOCIRAPTOR
+            // ------------------------------------------------------------------------
+            velociraptor: {
+                footstep(t) {
+                    // Rapid 3-step agile scurry with sickle-claw clicks
+                    const steps = [0, vary(0.11, 0.15), vary(0.22, 0.15)];
+                    steps.forEach((offset, idx) => {
+                        const st = t + offset;
+                        // Light pad thud
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(scaleFreq(220, 0.1), st);
+                        osc.frequency.exponentialRampToValueAtTime(scaleFreq(85, 0.1), st + 0.05);
+                        gain.gain.setValueAtTime(0.32 - idx * 0.04, st);
+                        gain.gain.exponentialRampToValueAtTime(0.001, st + 0.06);
+                        osc.connect(gain);
+                        routeToMaster(gain, 0.45);
+                        osc.start(st);
+                        osc.stop(st + 0.07);
+
+                        // Sharp keratin claw tap on stone/dirt
+                        triggerNoiseBurst({
+                            startTime: st,
+                            duration: 0.035,
+                            filterType: 'highpass',
+                            freqStart: vary(3200, 0.15),
+                            freqEnd: vary(1800, 0.15),
+                            Q: 2.5,
+                            gainPeak: 0.42,
+                            attack: 0.002,
+                            reverbSend: 0.5
+                        });
+                    });
+                },
+
+                eating(t) {
+                    // Snappy dual beak/jaw clicks + rapid flesh stripping
+                    [0, 0.14].forEach((offset) => {
+                        const st = t + offset;
+                        triggerNoiseBurst({
+                            startTime: st,
+                            duration: 0.045,
+                            filterType: 'bandpass',
+                            freqStart: vary(2800, 0.15),
+                            freqEnd: vary(1100, 0.15),
+                            Q: 4.5,
+                            gainPeak: 0.65,
+                            attack: 0.001,
+                            reverbSend: 0.4
+                        });
+                    });
+
+                    // Quick jerky tear
+                    triggerNoiseBurst({
+                        startTime: t + 0.18,
+                        duration: vary(0.32, 0.15),
+                        filterType: 'bandpass',
+                        freqStart: vary(1200, 0.15),
+                        freqEnd: vary(2600, 0.15),
+                        Q: 2.8,
+                        gainPeak: 0.48,
+                        attack: 0.03,
+                        reverbSend: 0.45
+                    });
+                },
+
+                roar(t) {
+                    // Piercing avian/reptilian shriek followed by a sharp pack bark
+                    const dur = vary(0.95, 0.1);
+                    const carrier = audioCtx.createOscillator();
+                    const mod = audioCtx.createOscillator();
+                    const modGain = audioCtx.createGain();
+
+                    carrier.type = 'sawtooth';
+                    mod.type = 'sine';
+
+                    const startF = scaleFreq(780, 0.08);
+                    const peakF = scaleFreq(1580, 0.09);
+                    const endF = scaleFreq(540, 0.08);
+
+                    carrier.frequency.setValueAtTime(startF, t);
+                    carrier.frequency.exponentialRampToValueAtTime(peakF, t + 0.14);
+                    carrier.frequency.exponentialRampToValueAtTime(peakF * 0.88, t + 0.45);
+                    carrier.frequency.exponentialRampToValueAtTime(endF, t + dur);
+
+                    // High-frequency syrinx rasp modulation
+                    mod.frequency.setValueAtTime(vary(68, 0.12), t);
+                    mod.frequency.linearRampToValueAtTime(vary(42, 0.12), t + dur);
+                    modGain.gain.setValueAtTime(vary(160, 0.15), t);
+                    modGain.gain.exponentialRampToValueAtTime(25, t + dur);
+
+                    mod.connect(modGain);
+                    modGain.connect(carrier.frequency);
+
+                    const bandpass = audioCtx.createBiquadFilter();
+                    bandpass.type = 'bandpass';
+                    bandpass.Q.value = 3.8;
+                    bandpass.frequency.setValueAtTime(scaleFreq(1450), t);
+                    bandpass.frequency.exponentialRampToValueAtTime(scaleFreq(2200), t + 0.2);
+                    bandpass.frequency.exponentialRampToValueAtTime(scaleFreq(1100), t + dur);
+
+                    const env = audioCtx.createGain();
+                    env.gain.setValueAtTime(0.001, t);
+                    env.gain.linearRampToValueAtTime(0.68, t + 0.05);
+                    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+                    carrier.connect(bandpass);
+                    bandpass.connect(env);
+                    routeToMaster(env, 0.95);
+
+                    // Airy hiss layer
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: dur * 0.85,
+                        filterType: 'bandpass',
+                        freqStart: scaleFreq(2900),
+                        freqEnd: scaleFreq(1800),
+                        Q: 2.2,
+                        gainPeak: 0.35,
+                        attack: 0.04,
+                        reverbSend: 0.8
+                    });
+
+                    carrier.start(t);
+                    mod.start(t);
+                    carrier.stop(t + dur + 0.02);
+                    mod.stop(t + dur + 0.02);
+                }
+            },
+
+            // ------------------------------------------------------------------------
+            // 3. TRICERATOPS
+            // ------------------------------------------------------------------------
+            triceratops: {
+                footstep(t) {
+                    // Heavy, dense 4-legged column stomp
+                    const sub = audioCtx.createOscillator();
+                    const subGain = audioCtx.createGain();
+                    sub.type = 'sine';
+                    sub.frequency.setValueAtTime(scaleFreq(84, 0.06), t);
+                    sub.frequency.exponentialRampToValueAtTime(scaleFreq(26, 0.05), t + 0.36);
+
+                    subGain.gain.setValueAtTime(0.001, t);
+                    subGain.gain.linearRampToValueAtTime(1.05, t + 0.015);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+
+                    sub.connect(subGain);
+                    routeToMaster(subGain, 0.95);
+                    sub.start(t);
+                    sub.stop(t + 0.7);
+
+                    // Earth thud noise
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: 0.32,
+                        filterType: 'lowpass',
+                        freqStart: vary(750, 0.12),
+                        freqEnd: vary(140, 0.1),
+                        Q: 1.5,
+                        gainPeak: 0.55,
+                        attack: 0.01,
+                        reverbSend: 0.8
+                    });
+                },
+
+                eating(t) {
+                    // 1. Sharp keratin beak shear snapping woody cycad branches
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: 0.08,
+                        filterType: 'bandpass',
+                        freqStart: vary(1950, 0.15),
+                        freqEnd: vary(750, 0.15),
+                        Q: 3.2,
+                        gainPeak: 0.68,
+                        attack: 0.004,
+                        reverbSend: 0.45
+                    });
+
+                    // 2. Rhythmic dental battery grinding (3 heavy jaw chews)
+                    [0.14, 0.34, 0.54].forEach((offset) => {
+                        triggerNoiseBurst({
+                            startTime: t + offset,
+                            duration: 0.15,
+                            filterType: 'bandpass',
+                            freqStart: vary(620, 0.12),
+                            freqEnd: vary(980, 0.12),
+                            Q: 2.6,
+                            gainPeak: 0.45,
+                            attack: 0.025,
+                            reverbSend: 0.35
+                        });
+                    });
+                },
+
+                roar(t) {
+                    // Deep brassy nasal horn bellow
+                    const dur = vary(2.1, 0.08);
+                    const osc1 = audioCtx.createOscillator();
+                    const osc2 = audioCtx.createOscillator();
+                    osc1.type = 'sawtooth';
+                    osc2.type = 'square';
+
+                    const baseF = scaleFreq(82, 0.06);
+                    osc1.frequency.setValueAtTime(baseF * 0.85, t);
+                    osc1.frequency.linearRampToValueAtTime(baseF * 1.15, t + 0.35);
+                    osc1.frequency.exponentialRampToValueAtTime(baseF * 0.72, t + dur);
+
+                    osc2.frequency.setValueAtTime(baseF * 0.5, t);
+                    osc2.frequency.linearRampToValueAtTime(baseF * 0.58, t + 0.35);
+                    osc2.frequency.exponentialRampToValueAtTime(baseF * 0.36, t + dur);
+
+                    const shaper = audioCtx.createWaveShaper();
+                    shaper.curve = createDistortionCurve(20);
+
+                    // Nasal chamber resonant formants (brassy trombone/elk-like character)
+                    const nasal1 = audioCtx.createBiquadFilter();
+                    nasal1.type = 'bandpass';
+                    nasal1.Q.value = 5.5;
+                    nasal1.frequency.setValueAtTime(scaleFreq(290), t);
+                    nasal1.frequency.linearRampToValueAtTime(scaleFreq(410), t + 0.4);
+                    nasal1.frequency.exponentialRampToValueAtTime(scaleFreq(240), t + dur);
+
+                    const nasal2 = audioCtx.createBiquadFilter();
+                    nasal2.type = 'bandpass';
+                    nasal2.Q.value = 6.0;
+                    nasal2.frequency.setValueAtTime(scaleFreq(720), t);
+                    nasal2.frequency.linearRampToValueAtTime(scaleFreq(960), t + 0.4);
+                    nasal2.frequency.exponentialRampToValueAtTime(scaleFreq(580), t + dur);
+
+                    const env = audioCtx.createGain();
+                    env.gain.setValueAtTime(0.001, t);
+                    env.gain.linearRampToValueAtTime(0.78, t + 0.22);
+                    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+                    osc1.connect(shaper);
+                    osc2.connect(shaper);
+                    shaper.connect(nasal1);
+                    shaper.connect(nasal2);
+                    nasal1.connect(env);
+                    nasal2.connect(env);
+
+                    routeToMaster(env, 1.15);
+
+                    osc1.start(t);
+                    osc2.start(t);
+                    osc1.stop(t + dur + 0.03);
+                    osc2.stop(t + dur + 0.03);
+                }
+            },
+
+            // ------------------------------------------------------------------------
+            // 4. STEGOSAURUS
+            // ------------------------------------------------------------------------
+            stegosaurus: {
+                footstep(t) {
+                    // Steady herbivore thud
+                    const sub = audioCtx.createOscillator();
+                    const subGain = audioCtx.createGain();
+                    sub.type = 'sine';
+                    sub.frequency.setValueAtTime(scaleFreq(92, 0.07), t);
+                    sub.frequency.exponentialRampToValueAtTime(scaleFreq(32, 0.06), t + 0.32);
+
+                    subGain.gain.setValueAtTime(0.001, t);
+                    subGain.gain.linearRampToValueAtTime(0.85, t + 0.015);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.52);
+
+                    sub.connect(subGain);
+                    routeToMaster(subGain, 0.85);
+                    sub.start(t);
+                    sub.stop(t + 0.55);
+
+                    // Subtle hollow keratin dermal plate rattle on stride
+                    [0.04, 0.13].forEach((offset, idx) => {
+                        const plateOsc = audioCtx.createOscillator();
+                        const plateGain = audioCtx.createGain();
+                        plateOsc.type = 'triangle';
+                        plateOsc.frequency.setValueAtTime(scaleFreq(410 - idx * 65, 0.12), t + offset);
+                        plateOsc.frequency.exponentialRampToValueAtTime(scaleFreq(220, 0.1), t + offset + 0.06);
+
+                        plateGain.gain.setValueAtTime(0.14, t + offset);
+                        plateGain.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.07);
+
+                        plateOsc.connect(plateGain);
+                        routeToMaster(plateGain, 0.5);
+                        plateOsc.start(t + offset);
+                        plateOsc.stop(t + offset + 0.08);
+                    });
+                },
+
+                eating(t) {
+                    // Soft leafy fern stripping + wet rhythmic chewing
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: 0.38,
+                        filterType: 'bandpass',
+                        freqStart: vary(1600, 0.15),
+                        freqEnd: vary(2400, 0.15),
+                        Q: 1.8,
+                        gainPeak: 0.45,
+                        attack: 0.04,
+                        reverbSend: 0.4
+                    });
+
+                    [0.25, 0.46].forEach((offset) => {
+                        triggerNoiseBurst({
+                            startTime: t + offset,
+                            duration: 0.16,
+                            filterType: 'lowpass',
+                            freqStart: vary(900, 0.12),
+                            freqEnd: vary(420, 0.12),
+                            Q: 2.0,
+                            gainPeak: 0.38,
+                            attack: 0.03,
+                            reverbSend: 0.3
+                        });
+                    });
+                },
+
+                roar(t) {
+                    // Low throaty groan followed by a breathy defensive snort
+                    const dur = vary(1.65, 0.08);
+                    const osc = audioCtx.createOscillator();
+                    const fm = audioCtx.createOscillator();
+                    const fmGain = audioCtx.createGain();
+
+                    osc.type = 'sawtooth';
+                    fm.type = 'sine';
+
+                    const baseF = scaleFreq(74, 0.07);
+                    osc.frequency.setValueAtTime(baseF * 0.9, t);
+                    osc.frequency.linearRampToValueAtTime(baseF * 1.12, t + 0.4);
+                    osc.frequency.exponentialRampToValueAtTime(baseF * 0.65, t + dur);
+
+                    fm.frequency.value = vary(22, 0.15);
+                    fmGain.gain.value = 14;
+                    fm.connect(fmGain);
+                    fmGain.connect(osc.frequency);
+
+                    const filter = audioCtx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.Q.value = 3.4;
+                    filter.frequency.setValueAtTime(scaleFreq(260), t);
+                    filter.frequency.linearRampToValueAtTime(scaleFreq(340), t + 0.4);
+                    filter.frequency.exponentialRampToValueAtTime(scaleFreq(190), t + dur);
+
+                    const env = audioCtx.createGain();
+                    env.gain.setValueAtTime(0.001, t);
+                    env.gain.linearRampToValueAtTime(0.68, t + 0.25);
+                    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+                    osc.connect(filter);
+                    filter.connect(env);
+                    routeToMaster(env, 1.0);
+
+                    // Breathy nostril snort at end
+                    triggerNoiseBurst({
+                        startTime: t + dur * 0.65,
+                        duration: 0.42,
+                        filterType: 'bandpass',
+                        freqStart: scaleFreq(820),
+                        freqEnd: scaleFreq(380),
+                        Q: 2.0,
+                        gainPeak: 0.45,
+                        attack: 0.04,
+                        reverbSend: 0.85
+                    });
+
+                    osc.start(t);
+                    fm.start(t);
+                    osc.stop(t + dur + 0.02);
+                    fm.stop(t + dur + 0.02);
+                }
+            },
+
+            // ------------------------------------------------------------------------
+            // 5. BRACHIOSAURUS
+            // ------------------------------------------------------------------------
+            brachiosaurus: {
+                footstep(t) {
+                    // Colossal 48-ton seismic shockwave
+                    const sub = audioCtx.createOscillator();
+                    const subGain = audioCtx.createGain();
+                    sub.type = 'sine';
+                    sub.frequency.setValueAtTime(scaleFreq(58, 0.05), t);
+                    sub.frequency.exponentialRampToValueAtTime(scaleFreq(18, 0.04), t + 0.65);
+
+                    subGain.gain.setValueAtTime(0.001, t);
+                    subGain.gain.linearRampToValueAtTime(1.25, t + 0.03);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 1.35);
+
+                    sub.connect(subGain);
+                    routeToMaster(subGain, 1.35);
+                    sub.start(t);
+                    sub.stop(t + 1.4);
+
+                    // Deep earth displacement rumble
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: 0.75,
+                        filterType: 'lowpass',
+                        freqStart: vary(420, 0.1),
+                        freqEnd: vary(85, 0.08),
+                        Q: 1.2,
+                        gainPeak: 0.65,
+                        attack: 0.03,
+                        reverbSend: 1.2
+                    });
+                },
+
+                eating(t) {
+                    // High canopy branch rustle + deep resonant throat swallow
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: 0.55,
+                        filterType: 'bandpass',
+                        freqStart: vary(2200, 0.15),
+                        freqEnd: vary(1300, 0.15),
+                        Q: 1.4,
+                        gainPeak: 0.42,
+                        attack: 0.08,
+                        reverbSend: 0.7
+                    });
+
+                    // Massive esophagus gulp/swallow
+                    const gulpOsc = audioCtx.createOscillator();
+                    const gulpGain = audioCtx.createGain();
+                    gulpOsc.type = 'sine';
+                    const gt = t + 0.42;
+                    gulpOsc.frequency.setValueAtTime(scaleFreq(145, 0.08), gt);
+                    gulpOsc.frequency.exponentialRampToValueAtTime(scaleFreq(52, 0.08), gt + 0.32);
+
+                    gulpGain.gain.setValueAtTime(0.001, gt);
+                    gulpGain.gain.linearRampToValueAtTime(0.55, gt + 0.06);
+                    gulpGain.gain.exponentialRampToValueAtTime(0.001, gt + 0.38);
+
+                    gulpOsc.connect(gulpGain);
+                    routeToMaster(gulpGain, 0.65);
+                    gulpOsc.start(gt);
+                    gulpOsc.stop(gt + 0.4);
+                },
+
+                roar(t) {
+                    // Long, melancholic, whale-like nasal crest trumpet
+                    const dur = vary(3.4, 0.07);
+                    const osc1 = audioCtx.createOscillator();
+                    const osc2 = audioCtx.createOscillator();
+                    const sub = audioCtx.createOscillator();
+
+                    osc1.type = 'triangle';
+                    osc2.type = 'sawtooth';
+                    sub.type = 'sine';
+
+                    const baseF = scaleFreq(118, 0.05);
+                    // Graceful rising and falling resonant contour
+                    [osc1, osc2].forEach((osc, i) => {
+                        const mult = i === 0 ? 1.0 : 1.006;
+                        osc.frequency.setValueAtTime(baseF * 0.75 * mult, t);
+                        osc.frequency.exponentialRampToValueAtTime(baseF * 1.45 * mult, t + dur * 0.35);
+                        osc.frequency.exponentialRampToValueAtTime(baseF * 1.15 * mult, t + dur * 0.7);
+                        osc.frequency.exponentialRampToValueAtTime(baseF * 0.58 * mult, t + dur);
+                    });
+
+                    sub.frequency.setValueAtTime(baseF * 0.38, t);
+                    sub.frequency.exponentialRampToValueAtTime(baseF * 0.72, t + dur * 0.35);
+                    sub.frequency.exponentialRampToValueAtTime(baseF * 0.29, t + dur);
+
+                    // Nasal dome chamber resonant filters
+                    const dome1 = audioCtx.createBiquadFilter();
+                    dome1.type = 'bandpass';
+                    dome1.Q.value = 6.5;
+                    dome1.frequency.setValueAtTime(scaleFreq(240), t);
+                    dome1.frequency.exponentialRampToValueAtTime(scaleFreq(460), t + dur * 0.35);
+                    dome1.frequency.exponentialRampToValueAtTime(scaleFreq(210), t + dur);
+
+                    const dome2 = audioCtx.createBiquadFilter();
+                    dome2.type = 'bandpass';
+                    dome2.Q.value = 5.0;
+                    dome2.frequency.setValueAtTime(scaleFreq(520), t);
+                    dome2.frequency.exponentialRampToValueAtTime(scaleFreq(880), t + dur * 0.35);
+                    dome2.frequency.exponentialRampToValueAtTime(scaleFreq(410), t + dur);
+
+                    const osc2Gain = audioCtx.createGain();
+                    osc2Gain.gain.value = 0.35; // Soften sawtooth harmonics for warm horn timbre
+
+                    const env = audioCtx.createGain();
+                    env.gain.setValueAtTime(0.001, t);
+                    env.gain.linearRampToValueAtTime(0.82, t + 0.45);
+                    env.gain.setValueAtTime(0.76, t + dur * 0.65);
+                    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+                    osc1.connect(dome1);
+                    osc2.connect(osc2Gain);
+                    osc2Gain.connect(dome1);
+                    osc2Gain.connect(dome2);
+                    sub.connect(env);
+                    dome1.connect(env);
+                    dome2.connect(env);
+
+                    routeToMaster(env, 1.45);
+
+                    [osc1, osc2, sub].forEach(o => {
+                        o.start(t);
+                        o.stop(t + dur + 0.05);
+                    });
+                }
+            },
+
+            // ------------------------------------------------------------------------
+            // 6. SPINOSAURUS
+            // ------------------------------------------------------------------------
+            spinosaurus: {
+                footstep(t) {
+                    // Heavy riverbank mud thud + water splash
+                    const sub = audioCtx.createOscillator();
+                    const subGain = audioCtx.createGain();
+                    sub.type = 'sine';
+                    sub.frequency.setValueAtTime(scaleFreq(78, 0.07), t);
+                    sub.frequency.exponentialRampToValueAtTime(scaleFreq(26, 0.06), t + 0.38);
+
+                    subGain.gain.setValueAtTime(0.001, t);
+                    subGain.gain.linearRampToValueAtTime(0.95, t + 0.015);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+
+                    sub.connect(subGain);
+                    routeToMaster(subGain, 0.95);
+                    sub.start(t);
+                    sub.stop(t + 0.7);
+
+                    // Wet water splash spray
+                    triggerNoiseBurst({
+                        startTime: t + 0.02,
+                        duration: vary(0.48, 0.15),
+                        filterType: 'bandpass',
+                        freqStart: vary(1800, 0.15),
+                        freqEnd: vary(650, 0.15),
+                        Q: 1.1,
+                        gainPeak: 0.58,
+                        attack: 0.02,
+                        reverbSend: 0.95
+                    });
+                },
+
+                eating(t) {
+                    // Hollow elongated snout jaw clap + fish scale/bone crunch
+                    const clapOsc = audioCtx.createOscillator();
+                    const clapGain = audioCtx.createGain();
+                    clapOsc.type = 'triangle';
+                    clapOsc.frequency.setValueAtTime(scaleFreq(340, 0.09), t);
+                    clapOsc.frequency.exponentialRampToValueAtTime(scaleFreq(95, 0.08), t + 0.09);
+
+                    clapGain.gain.setValueAtTime(0.75, t);
+                    clapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+                    clapOsc.connect(clapGain);
+                    routeToMaster(clapGain, 0.6);
+                    clapOsc.start(t);
+                    clapOsc.stop(t + 0.12);
+
+                    // Crisp conical tooth snap & wet splash
+                    triggerNoiseBurst({
+                        startTime: t,
+                        duration: 0.06,
+                        filterType: 'bandpass',
+                        freqStart: vary(2600, 0.12),
+                        freqEnd: vary(1200, 0.12),
+                        Q: 4.0,
+                        gainPeak: 0.72,
+                        attack: 0.002,
+                        reverbSend: 0.5
+                    });
+
+                    triggerNoiseBurst({
+                        startTime: t + 0.12,
+                        duration: 0.34,
+                        filterType: 'bandpass',
+                        freqStart: vary(1400, 0.15),
+                        freqEnd: vary(750, 0.15),
+                        Q: 2.0,
+                        gainPeak: 0.45,
+                        attack: 0.02,
+                        reverbSend: 0.65
+                    });
+                },
+
+                roar(t) {
+                    // Crocodilian-meets-theropod hollow tubular snout bellow
+                    const dur = vary(2.35, 0.08);
+                    const osc1 = audioCtx.createOscillator();
+                    const sub = audioCtx.createOscillator();
+                    const fm = audioCtx.createOscillator();
+                    const fmGain = audioCtx.createGain();
+
+                    osc1.type = 'sawtooth';
+                    sub.type = 'sine';
+                    fm.type = 'triangle';
+
+                    const baseF = scaleFreq(68, 0.07);
+                    osc1.frequency.setValueAtTime(baseF * 0.85, t);
+                    osc1.frequency.exponentialRampToValueAtTime(baseF * 1.22, t + 0.3);
+                    osc1.frequency.exponentialRampToValueAtTime(baseF * 0.74, t + dur);
+
+                    sub.frequency.setValueAtTime(baseF * 0.48, t);
+                    sub.frequency.exponentialRampToValueAtTime(baseF * 0.62, t + 0.3);
+                    sub.frequency.exponentialRampToValueAtTime(baseF * 0.36, t + dur);
+
+                    // Deep crocodilian water-dance rumble modulation (18Hz)
+                    fm.frequency.setValueAtTime(vary(19, 0.12), t);
+                    fmGain.gain.setValueAtTime(vary(24, 0.15), t);
+                    fm.connect(fmGain);
+                    fmGain.connect(osc1.frequency);
+
+                    const shaper = audioCtx.createWaveShaper();
+                    shaper.curve = createDistortionCurve(42);
+
+                    // Narrow elongated rostrum resonant tube filter
+                    const snoutTube = audioCtx.createBiquadFilter();
+                    snoutTube.type = 'bandpass';
+                    snoutTube.Q.value = 6.2;
+                    snoutTube.frequency.setValueAtTime(scaleFreq(310), t);
+                    snoutTube.frequency.exponentialRampToValueAtTime(scaleFreq(470), t + 0.35);
+                    snoutTube.frequency.exponentialRampToValueAtTime(scaleFreq(245), t + dur);
+
+                    const chestFormant = audioCtx.createBiquadFilter();
+                    chestFormant.type = 'bandpass';
+                    chestFormant.Q.value = 3.0;
+                    chestFormant.frequency.setValueAtTime(scaleFreq(150), t);
+
+                    const env = audioCtx.createGain();
+                    env.gain.setValueAtTime(0.001, t);
+                    env.gain.linearRampToValueAtTime(0.84, t + 0.2);
+                    env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+                    osc1.connect(shaper);
+                    shaper.connect(snoutTube);
+                    shaper.connect(chestFormant);
+                    snoutTube.connect(env);
+                    chestFormant.connect(env);
+                    sub.connect(env);
+
+                    routeToMaster(env, 1.25);
+
+                    [osc1, sub, fm].forEach(o => {
+                        o.start(t);
+                        o.stop(t + dur + 0.04);
+                    });
+                }
+            }
+        };
+
+        /**
+         * Triggers a specific dinosaur action, updates UI telemetry, and animates the button.
+         */
+        function triggerDinosaurSound(speciesId, action) {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const species = SPECIES_DATA.find(s => s.id === speciesId);
+            if (!species || !SynthEngines[speciesId]) return;
+
+            // Execute procedural synthesis
+            SynthEngines[speciesId][action](now);
+
+            // Update telemetry label
+            const padInfo = species.pads.find(p => p.action === action);
+            const label = document.getElementById('active-sound-label');
+            label.textContent = `${species.name.toUpperCase()} // ${padInfo.label.toUpperCase()}`;
+
+            // Visual pad animation
+            const btn = document.getElementById(`pad-${speciesId}-${action}`);
+            if (btn) {
+                btn.classList.remove('pad-triggered');
+                void btn.offsetWidth; // trigger reflow
+                btn.classList.add('pad-triggered');
+                btn.style.borderColor = species.accentColor;
+                setTimeout(() => {
+                    btn.style.borderColor = '';
+                }, 320);
+            }
+        }
+
+        /**
+         * Renders the 6 dinosaur cards and sound pads into the DOM.
+         */
+        function renderSoundboard() {
+            const grid = document.getElementById('dino-grid');
+            grid.innerHTML = SPECIES_DATA.map(dino => `
+                <article class="bg-slate-900/65 backdrop-blur-md border border-slate-800/90 rounded-2xl p-5 flex flex-col justify-between transition-all duration-200 ${dino.glowClass}">
+                    <div>
+                        <!-- Header Row -->
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <span class="mono text-[10px] uppercase tracking-widest text-slate-500">${dino.period}</span>
+                                <h2 class="text-lg font-bold text-slate-100 mt-0.5 italic">${dino.name}</h2>
+                            </div>
+                            <span class="mono text-[11px] font-medium px-2.5 py-1 rounded-lg border ${dino.badgeClass}">
+                                ${dino.mass}
+                            </span>
+                        </div>
+
+                        <!-- Diet & Anatomy Metadata -->
+                        <div class="mt-3 pt-3 border-t border-slate-800/80">
+                            <div class="flex items-center gap-2 text-xs font-medium text-slate-300 mb-1">
+                                <span class="w-2 h-2 rounded-full" style="background-color: ${dino.accentColor}"></span>
+                                <span>${dino.diet}</span>
+                            </div>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                ${dino.vocalNotes}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Acoustic Trigger Pads -->
+                    <div class="mt-5 grid grid-cols-1 gap-2.5">
+                        ${dino.pads.map((pad, idx) => {
+                            const iconSvg = idx === 0
+                                ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`
+                                : idx === 1
+                                ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"/></svg>`
+                                : `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>`;
+
+                            return `
+                                <button
+                                    id="pad-${dino.id}-${pad.action}"
+                                    onclick="triggerDinosaurSound('${dino.id}', '${pad.action}')"
+                                    class="group w-full text-left px-3.5 py-2.5 rounded-xl bg-slate-950/75 hover:bg-slate-800/90 active:bg-slate-800 border border-slate-800 transition-all duration-150 flex items-center justify-between cursor-pointer select-none"
+                                >
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 group-hover:text-white transition-colors" style="color: ${dino.accentColor}">
+                                            ${iconSvg}
+                                        </div>
+                                        <div>
+                                            <div class="text-xs font-semibold text-slate-200 group-hover:text-white">${pad.label}</div>
+                                            <div class="text-[11px] text-slate-500">${pad.sub}</div>
+                                        </div>
+                                    </div>
+                                    <span class="mono text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800 group-hover:text-slate-300">
+                                        ${dino.keys[idx]}
+                                    </span>
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </article>
+            `).join('');
+        }
+
+        /**
+         * Real-time Canvas Oscilloscope & Frequency Spectrum Visualizer
+         */
+        function startVisualizers() {
+            const scopeCanvas = document.getElementById('scope-canvas');
+            const specCanvas = document.getElementById('spectrum-canvas');
+            const scopeCtx = scopeCanvas.getContext('2d');
+            const specCtx = specCanvas.getContext('2d');
+
+            const bufferLength = analyser.frequencyBinCount;
+            const timeData = new Uint8Array(bufferLength);
+            const freqData = new Uint8Array(bufferLength);
+
+            function resizeCanvases() {
+                [scopeCanvas, specCanvas].forEach(c => {
+                    const rect = c.getBoundingClientRect();
+                    c.width = rect.width * window.devicePixelRatio;
+                    c.height = rect.height * window.devicePixelRatio;
+                });
+            }
+            resizeCanvases();
+            window.addEventListener('resize', resizeCanvases);
+
+            function draw() {
+                requestAnimationFrame(draw);
+
+                // 1. Oscilloscope
+                analyser.getByteTimeDomainData(timeData);
+                const sw = scopeCanvas.width;
+                const sh = scopeCanvas.height;
+                scopeCtx.fillStyle = '#06080a';
+                scopeCtx.fillRect(0, 0, sw, sh);
+
+                // Subtle center line
+                scopeCtx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
+                scopeCtx.lineWidth = 1;
+                scopeCtx.beginPath();
+                scopeCtx.moveTo(0, sh / 2);
+                scopeCtx.lineTo(sw, sh / 2);
+                scopeCtx.stroke();
+
+                scopeCtx.lineWidth = 2 * window.devicePixelRatio;
+                scopeCtx.strokeStyle = '#f59e0b';
+                scopeCtx.beginPath();
+
+                const sliceWidth = sw / bufferLength;
+                let x = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    const v = timeData[i] / 128.0;
+                    const y = (v * sh) / 2;
+                    if (i === 0) scopeCtx.moveTo(x, y);
+                    else scopeCtx.lineTo(x, y);
+                    x += sliceWidth;
+                }
+                scopeCtx.lineTo(sw, sh / 2);
+                scopeCtx.stroke();
+
+                // 2. Logarithmic-style Frequency Spectrum
+                analyser.getByteFrequencyData(freqData);
+                const fw = specCanvas.width;
+                const fh = specCanvas.height;
+                specCtx.fillStyle = '#06080a';
+                specCtx.fillRect(0, 0, fw, fh);
+
+                const bars = 64;
+                const barWidth = (fw / bars) - 2;
+                for (let i = 0; i < bars; i++) {
+                    // Focus resolution on low-to-mid bio-acoustic frequencies
+                    const binIndex = Math.floor(Math.pow(i / bars, 1.65) * (bufferLength * 0.45));
+                    const val = freqData[binIndex] / 255.0;
+                    const barHeight = val * (fh * 0.85);
+
+                    const hue = 35 - val * 28; // Amber to crimson peak
+                    specCtx.fillStyle = `hsla(${hue}, 92%, 55%, ${0.35 + val * 0.65})`;
+                    specCtx.fillRect(
+                        i * (barWidth + 2),
+                        fh - barHeight,
+                        barWidth,
+                        barHeight
+                    );
+                }
+            }
+            draw();
+        }
+
+        /**
+         * Wire up Master Controls, Keyboard Shortcuts, and Ecosystem Ambient Mode
+         */
+        function setupControls() {
+            const volSlider = document.getElementById('master-vol');
+            const revSlider = document.getElementById('reverb-mix');
+            const scaleSlider = document.getElementById('mass-scale');
+            const ambientBtn = document.getElementById('ambient-btn');
+
+            volSlider.addEventListener('input', (e) => {
+                params.volume = parseFloat(e.target.value);
+                document.getElementById('vol-val').textContent = `${Math.round(params.volume * 100)}%`;
+                if (masterGain) masterGain.gain.setTargetAtTime(params.volume, audioCtx.currentTime, 0.02);
+            });
+
+            revSlider.addEventListener('input', (e) => {
+                params.reverb = parseFloat(e.target.value);
+                document.getElementById('rev-val').textContent = `${Math.round((params.reverb / 0.9) * 100)}%`;
+                if (wetGain) wetGain.gain.setTargetAtTime(params.reverb, audioCtx.currentTime, 0.02);
+            });
+
+            scaleSlider.addEventListener('input', (e) => {
+                params.massScale = parseFloat(e.target.value);
+                document.getElementById('scale-val').textContent = `${params.massScale.toFixed(2)}x`;
+            });
+
+            // Ecosystem Simulation Mode: Automatically triggers realistic distant footsteps & calls
+            ambientBtn.addEventListener('click', () => {
+                initAudio();
+                const dot = document.getElementById('ambient-dot');
+                if (ecosystemInterval) {
+                    clearInterval(ecosystemInterval);
+                    ecosystemInterval = null;
+                    ambientBtn.classList.remove('border-amber-500/50', 'bg-amber-500/10', 'text-amber-300');
+                    dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+                } else {
+                    ambientBtn.classList.add('border-amber-500/50', 'bg-amber-500/10', 'text-amber-300');
+                    dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+                    
+                    const runEvent = () => {
+                        const randomDino = SPECIES_DATA[Math.floor(Math.random() * SPECIES_DATA.length)];
+                        const actions = ['footstep', 'footstep', 'eating', 'roar'];
+                        const randomAction = actions[Math.floor(Math.random() * actions.length)];
+                        triggerDinosaurSound(randomDino.id, randomAction);
+                    };
+                    runEvent();
+                    ecosystemInterval = setInterval(runEvent, 2600);
+                }
+            });
+
+            // Keyboard shortcut mapping (1-9, Q-E, A-D, Z-C)
+            const keyMap = {};
+            SPECIES_DATA.forEach(dino => {
+                dino.keys.forEach((k, idx) => {
+                    keyMap[k.toLowerCase()] = { id: dino.id, action: dino.pads[idx].action };
+                });
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.repeat) return;
+                const mapped = keyMap[e.key.toLowerCase()];
+                if (mapped) {
+                    triggerDinosaurSound(mapped.id, mapped.action);
+                }
+            });
+        }
+
+        // Initialize UI on load
+        renderSoundboard();
+        setupControls();
+    </script>
+</body>
+</html>
